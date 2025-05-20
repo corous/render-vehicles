@@ -1,0 +1,6 @@
+streamlit>=1.33
+pydeck>=0.8
+fastapi>=0.68.0
+uvicorn>=0.15.0
+sseclient-py>=1.7.2
+requests>=2.26.0
