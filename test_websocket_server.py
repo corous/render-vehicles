@@ -154,29 +154,23 @@ ANIMATORS = {
 }
 
 # ----------------------- SSE stream with start delay ---------------------- #
-async def sse_stream():
-    """Emit one update per vehicle every TICK_SEC seconds after START_DELAY_SEC."""
-    await asyncio.sleep(START_DELAY_SEC)           # 30-second warm-up
 
+async def sse_stream():
+    await asyncio.sleep(START_DELAY_SEC)  # 30‑second warm‑up
     while True:
-        # 1️⃣ ask every animator for its next point concurrently
-        try:
-            results = await asyncio.gather(
-                *[gen.__anext__() for gen in ANIMATORS.values()],
-                return_exceptions=False,
-            )
-        except StopAsyncIteration:
-            # should never happen (animators loop forever) but rebuild just in case
-            for vid, poly in list(ANIMATORS.items()):
+        for vid, gen in list(ANIMATORS.items()):
+            try:
+                lat, lon, hdg = await gen.__anext__()
+            except StopAsyncIteration:
+                # Rebuild animator in the rare event it ends
                 if vid.startswith("truck"):
                     ANIMATORS[vid] = make_animator(truck_path, TRUCK_SPEED_MPH)
                 else:
                     idx = int(vid.split("-")[1]) - 1
-                    ANIMATORS[vid] = make_animator(drone_paths[idx], DRONE_SPEED_MPH)
-            continue   # retry this tick
-
-        # 2️⃣ package and yield each payload
-        for (vid, _), (lat, lon, hdg) in zip(ANIMATORS.items(), results):
+                    if idx < len(drone_paths) and drone_paths[idx]:
+                        ANIMATORS[vid] = make_animator(drone_paths[idx], DRONE_SPEED_MPH)
+                    continue
+                lat, lon, hdg = await ANIMATORS[vid].__anext__()
             payload = {
                 "id": vid,
                 "type": "truck" if vid.startswith("truck") else "drone",
@@ -185,18 +179,23 @@ async def sse_stream():
                 "heading": hdg,
                 "timestamp": datetime.utcnow().isoformat() + "Z",
             }
-            yield f"data: {json.dumps(payload)}\n\n"
-
-        # 3️⃣ wait before next frame
-        await asyncio.sleep(TICK_SEC)
+            yield f"data: {json.dumps(payload)}"
 
 @app.get("/stream")
 async def stream(_req: Request):
-    return StreamingResponse(sse_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        sse_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # disable Nginx/Render buffering
+        },
+    )
 
 @app.get("/")
 async def root():
-    return {"msg": f"Telemetry starts {START_DELAY_SEC}s after server launch – connect to /stream"}
+    return {"msg": "Telemetry will start 30 s after server launch – connect to /stream"}
 
 if __name__ == "__main__":
     uvicorn.run("test_websocket_server:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
