@@ -160,14 +160,15 @@ async def sse_stream():
     while True:
         for vid, gen in ANIMATORS.items():
             lat, lon, hdg = await gen.__anext__()
-            yield f"data: {json.dumps({
-                'id': vid,
-                'type': 'truck' if vid.startswith('truck') else 'drone',
-                'lat': lat,
-                'lon': lon,
-                'heading': hdg,
-                'timestamp': datetime.utcnow().isoformat() + 'Z',
-            })}\n\n"
+            payload = {
+            "id": vid,
+            "type": "truck" if vid.startswith("truck") else "drone",
+            "lat": lat,
+            "lon": lon,
+            "heading": hdg,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            }
+            yield f"data: {json.dumps(payload)}"
 
 @app.get("/stream")
 async def stream(_req: Request):
@@ -175,7 +176,7 @@ async def stream(_req: Request):
 
 @app.get("/")
 async def root():
-    return {"msg": "Telemetry will start 30 s after server launch – connect to /stream"}
+    return {"msg": "Telemetry will start 30 seconds after server launch - connect to /stream"}
 
 if __name__ == "__main__":
     uvicorn.run("test_websocket_server:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
