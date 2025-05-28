@@ -186,18 +186,24 @@ async def stream(_req: Request):
 # ----------------------- control endpoints --------------------------------- #
 
 @app.post("/start")
-async def start_sim(body: dict):
-    if body.get("cmd") != "start":
-        raise HTTPException(400, "Expected {'cmd':'start'}")
+@app.get("/start")
+async def start_sim(request: Request, body: dict | None = None):
+    """Toggle simulation on – accepts POST with JSON {cmd:'start'} **or** simple GET."""
+    if request.method == "POST":
+        if not body or body.get("cmd") != "start":
+            raise HTTPException(400, "Expected JSON {'cmd':'start'} in POST body")
     STARTED.set()
-    return {"started": True}
+    return {"started": True} {"started": True}
 
 @app.post("/stop")
-async def stop_sim(body: dict):
-    if body.get("cmd") != "stop":
-        raise HTTPException(400, "Expected {'cmd':'stop'}")
+@app.get("/stop")
+async def stop_sim(request: Request, body: dict | None = None):
+    """Pause simulation – accepts POST {cmd:'stop'} or simple GET."""
+    if request.method == "POST":
+        if not body or body.get("cmd") != "stop":
+            raise HTTPException(400, "Expected JSON {'cmd':'stop'} in POST body")
     STARTED.clear()
-    return {"started": False}
+    return {"started": False} {"started": False}
 
 @app.get("/status")
 async def status():
