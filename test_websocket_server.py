@@ -193,7 +193,7 @@ async def start_sim(request: Request, body: dict | None = None):
         if not body or body.get("cmd") != "start":
             raise HTTPException(400, "Expected JSON {'cmd':'start'} in POST body")
     STARTED.set()
-    return {"started": True} {"started": True}
+    return {"started": True}
 
 @app.post("/stop")
 @app.get("/stop")
@@ -203,7 +203,7 @@ async def stop_sim(request: Request, body: dict | None = None):
         if not body or body.get("cmd") != "stop":
             raise HTTPException(400, "Expected JSON {'cmd':'stop'} in POST body")
     STARTED.clear()
-    return {"started": False} {"started": False}
+    return {"started": False}
 
 @app.get("/status")
 async def status():
