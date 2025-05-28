@@ -158,15 +158,26 @@ ANIMATORS = {
 async def sse_stream():
     await asyncio.sleep(START_DELAY_SEC)  # 30‑second warm‑up
     while True:
-        for vid, gen in ANIMATORS.items():
-            lat, lon, hdg = await gen.__anext__()
+        for vid, gen in list(ANIMATORS.items()):
+            try:
+                lat, lon, hdg = await gen.__anext__()
+            except StopAsyncIteration:
+                # Rebuild animator in the rare event it ends
+                if vid.startswith("truck"):
+                    ANIMATORS[vid] = make_animator(truck_path, TRUCK_SPEED_MPH)
+                else:
+                    idx = int(vid.split("-")[1]) - 1
+                    if idx < len(drone_paths) and drone_paths[idx]:
+                        ANIMATORS[vid] = make_animator(drone_paths[idx], DRONE_SPEED_MPH)
+                    continue
+                lat, lon, hdg = await ANIMATORS[vid].__anext__()
             payload = {
-            "id": vid,
-            "type": "truck" if vid.startswith("truck") else "drone",
-            "lat": lat,
-            "lon": lon,
-            "heading": hdg,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+                "id": vid,
+                "type": "truck" if vid.startswith("truck") else "drone",
+                "lat": lat,
+                "lon": lon,
+                "heading": hdg,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
             }
             yield f"data: {json.dumps(payload)}"
 
@@ -176,7 +187,7 @@ async def stream(_req: Request):
 
 @app.get("/")
 async def root():
-    return {"msg": "Telemetry will start 30 seconds after server launch - connect to /stream"}
+    return {"msg": "Telemetry will start 30 s after server launch – connect to /stream"}
 
 if __name__ == "__main__":
     uvicorn.run("test_websocket_server:app", host="0.0.0.0", port=int(os.getenv("PORT", 8000)))
